@@ -44,6 +44,11 @@ def get_groups_to_use() -> List[Grupo]:
 
 
 if __name__ == "__main__":
+    """We are interested in send sticky messages to trial groups in their first 4 weeks.
+    - Depending on the week, the message will be different.
+    - We are required to store the message in a Google Spreadsheet for later use.
+    """
+
     import os
 
     filename = os.getenv("GOOGLE_FILE")
