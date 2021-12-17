@@ -1,0 +1,7 @@
+venv
+tmp/client_secret.json
+tmp/credentials.txt
+workspace.code-workspace
+.env
+__pycache__/spreadsheet_manager.cpython-38.pyc
+db/__pycache__/crud_dynamodb.cpython-38.pyc
