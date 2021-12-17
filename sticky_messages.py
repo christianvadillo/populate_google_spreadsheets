@@ -1,9 +1,10 @@
 import dataclasses
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict
 
 from db.crud_dynamodb import get_trial_groups
+from gspread_manager.spreadsheet_manager import SpreadSheetManager, Spreadsheet
 
 
 MESSAGES = ["WEEK 1 MESSAGE", "WEEK 2 MESSAGE", "WEEK 3 MESSAGE", "WEEK 4 MESSAGE"]
@@ -12,10 +13,11 @@ MESSAGES = ["WEEK 1 MESSAGE", "WEEK 2 MESSAGE", "WEEK 3 MESSAGE", "WEEK 4 MESSAG
 @dataclasses.dataclass
 class Grupo:
     tag: str
-    weeks_in_service: Optional[int]
     started_date: str
     name: str
     platform: str
+    weeks_in_service: Optional[int]
+    message: Optional[str]
 
     def __init__(self, **kwargs):
         self.tag = kwargs.get("Etiqueta")
@@ -30,21 +32,26 @@ class Grupo:
         return days // 7
 
 
-def populate_spreadsheet():
+def get_groups_to_use() -> List[Grupo]:
     groups = [Grupo(**item) for item in get_trial_groups()]
-    # We are interested in the groups that have been in service for less than 5 weeks
+    to_use = []
+
     for group in groups:
         if group.weeks_in_service < 4:
-            print(group.name)
-            print(group.weeks_in_service)
-            print(MESSAGES[group.weeks_in_service])
-            print("-----------------------------------------------------")
-
-    import pdb
-
-    pdb.set_trace()
+            group.message = MESSAGES[group.weeks_in_service]
+            to_use.append(group)
+    return to_use
 
 
 if __name__ == "__main__":
-    populate_spreadsheet(filename = "DATA_Actividades_AWS"
-    sheet = "Cumpleanios")
+    import os
+
+    filename = os.getenv("GOOGLE_FILE")
+    sheet_name = os.getenv("SHEET_NAME")
+    to_use = get_groups_to_use()
+
+    sheet_file = Spreadsheet()
+    sheet_file.headers = ["grupo", "mensaje", "imagen"]
+    sheet_file.rows = [[group.name, group.message, ""] for group in to_use]
+    manager = SpreadSheetManager(filename, sheet_name)
+    manager.poppulate_sheet(sheet_file, clear_previous=True)

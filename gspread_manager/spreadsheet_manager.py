@@ -1,9 +1,21 @@
 import gspread
+import dataclasses
 
 from oauth2client.service_account import ServiceAccountCredentials
 from gspread.exceptions import CellNotFound, SpreadsheetNotFound
-from typing import Dict, List
+from typing import Dict, List, Optional
 from pathlib import Path
+
+from .exceptions import NotAllRowsAddedError
+
+
+@dataclasses.dataclass
+class Spreadsheet:
+    filename: Optional[str] = dataclasses.field(init=False)
+    sheet_name: Optional[str] = dataclasses.field(init=False)
+    rows: List[List] = dataclasses.field(default_factory=list, init=False)
+    headers: List[str] = dataclasses.field(default_factory=list, init=False)
+
 
 class SpreadSheetManager:
     SCOPE = [
@@ -60,6 +72,53 @@ class SpreadSheetManager:
     def remove_rows(self, start_idx, end_idx):
         self.worksheet.delete_rows(start_idx, end_idx)
 
+    def clear_all_rows(self):
+        self.worksheet.clear()
+
+    def add_rows(self, rows: List[List]):
+        pass
+
+    def batch_writing(self, rows: List[List], headers: List[str] = None):
+        import string
+
+        LETTERS = list(string.ascii_uppercase)  # Up to 26 columns
+        end_col = LETTERS[len(headers) - 1]
+
+        range_ = "{start}{row}:{end}{row}"
+        batch = [
+            {
+                "range": range_.format(start="A", end=end_col, row=idx),
+                "values": [row],
+            }
+            for idx, row in enumerate(rows, 2)
+        ]
+        batch.insert(
+            0,
+            {
+                "range": range_.format(start="A", end=end_col, row=1),
+                "values": [headers],
+            },
+        )
+
+        self.worksheet.batch_update(batch)
+
+    def poppulate_sheet(self, file: Spreadsheet, clear_previous: bool = False):
+        """It will add data from a given Spreadsheet object to the active worksheet
+
+        Args:
+            file (Spreadsheet): Object that contains the rows, headers and sheet name
+            clear_previous (bool, optional): To remove previous data from the sheet.
+            Defaults to False.
+        """
+
+        if clear_previous:
+            self.clear_all_rows()
+
+        self.batch_writing(file.rows, file.headers)
+        sheet_data = self.sheet_data()
+        if len(sheet_data) != len(file.rows):
+            raise NotAllRowsAddedError("Some rows were not added")
+
     @property
     def worksheets(self):
         worksheets = self._file.worksheets()
@@ -67,13 +126,3 @@ class SpreadSheetManager:
 
     def __repr__(self) -> str:
         return f"Spreadsheet: {self.filename}\nSheetname: {self.sheet_name}"
-
-
-# if __name__ == "__main__":
-#     filename = "DATA_Actividades_AWS"
-#     sheet = "Cumpleanios"
-#     manager = SpreadSheetManager(filename, sheet)
-#     sheet_data = manager.sheet_data()
-#     import pdb; pdb.set_trace()
-# # sheets = manager.worksheets
-# # manager.find_edit_cell('fecha (yyyy-mm-dd)', 'EDIT THIS', 'EDITADO2')
